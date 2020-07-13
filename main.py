@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from prettytable import PrettyTable
 import json
 import logging
 import configparser
@@ -6,11 +7,21 @@ import os
 
 basic_generator, set_of_var = {'a': 84589, 'c': 45989, 'm': 217728}, {}
 order_history, providers, directions, currency_pairs = [], [], [], []
-number_of_orders = 0
+number_of_orders, percent_of_red, percent_of_blue = 0, 0.15, 0.3
 start_date = datetime.now()
 PATH_LOGS = (str(os.getcwd() + "/Logs/"))
 PATH_DATABASE = os.getcwd() + "/database.json"
-#logging.basicConfig(level=logging.INFO,
+workflow = [
+    [["To Provider", "Partially Filled"], ["To Provider", "Rejected"],
+     ["To Provider", "Filled"], ["Partially Filled", "Filled"],
+     ["Partially Filled"], ["Rejected"]],
+    [["New", "To Provider", "Filled"], ["New", "To Provider", "Partially Filled"],
+     ["New", "To Provider", "Rejected"]],
+    [["New"], ["New", "To Provider"]]
+]
+
+
+# logging.basicConfig(level=logging.INFO,
 #                   filename=PATH_LOGS + datetime.now().strftime("%d:%m:%Y-%H:%M")+".txt")
 
 
@@ -22,17 +33,17 @@ def create_config(path):
     config.set("PATH", "database", PATH_DATABASE)
     config.set("VALUES", "number_of_orders", 2000)
     config.set("VALUES", "start_date", "12/07/20 00:00:00")
-    config.set("VALUES", "percent_of_red", 0.15)
-    config.set("VALUES", "percent_of_blue", 0.3)
+    config.set("VALUES", "percent_of_red", "0.15")
+    config.set("VALUES", "percent_of_blue", "0.3")
     with open(path, "w") as conf_file:
         config.write(conf_file)
 
 
 def read_config(path):
     global number_of_orders, start_date
-    #logging.info("Reading config")
+    # logging.info("Reading config")
     if not os.path.exists(path):
-        #logging.warn("CANT FIND CONFIG FILE, CREATING STANDART AND USING IT")
+        # logging.warn("CANT FIND CONFIG FILE, CREATING STANDART AND USING IT")
         create_config(path)
         read_config(path)
     else:
@@ -41,6 +52,8 @@ def read_config(path):
         PATH_LOGS = config.get("PATH", "logs")
         PATH_DATABASE = config.get("PATH", "database")
         number_of_orders = int(config.get("VALUES", "number_of_orders"))
+        percent_of_red = float(config.get("VALUES", "percent_of_red"))
+        percent_of_blue = float(config.get("VALUES", "percent_of_blue"))
         start_date = datetime.strptime(config.get("VALUES", "start_date"), '%d/%m/%y %H:%M:%S')
 
 
@@ -82,18 +95,20 @@ def generate_id():
     prev = 2350
     prev_id = 1
     start_id = 1000000000
+    counter = 0
     for order in order_history:
         prev = generator_rnd_number(set_of_var, prev_id)
         if prev % 7 == 0 and prev % 5 == 0:
             while (prev > 10):
                 prev = prev // 10
             prev_id = prev_id + prev + 1
-            order.append(prev_id)
+            order.append(counter)
             order.append(start_id + prev_id)
         else:
             prev_id += 1
-            order.append(prev_id)
+            order.append(counter)
             order.append(start_id + prev_id)
+        counter +=1
 
 
 def generate_provider():
@@ -115,35 +130,59 @@ def generate_currency():
     update_generator_vars()
     prev = 1
     for order in order_history:
-        #curency pair
+        # curency pair
         order.append(generator_from_template(set_of_var, order[0], currency_pairs)[0])
 
-        #px
+        # px
         course = generator_from_template(set_of_var, order[0], currency_pairs)[1]
         delta = generator_rnd_number(set_of_var, order[0])
         if delta % 2 == 0:
-            while delta>0.05:
+            while delta > 0.05:
                 delta = delta / 10
             order.append(float('{:.6f}'.format(course + course * delta)))
         else:
-            while delta>0.05:
+            while delta > 0.05:
                 delta = delta / 10
             order.append(float('{:.6f}'.format(course - course * delta)))
 
-        #volume
-        volume = generator_rnd_number(set_of_var,order[0]) % 1000
+        # volume
+        volume = generator_rnd_number(set_of_var, order[0]) % 1000
         order.append(volume)
+
+
+
+def generate_history():
+    global order_history
+    number_of_blue = int(number_of_orders * percent_of_blue)
+    number_of_red = int(number_of_orders * percent_of_red)
+    number_of_green = number_of_orders - number_of_blue - number_of_red
+    counter, zone = 0, 0
+    for order in order_history:
+        update_generator_vars()
+        order.append(generator_from_template(set_of_var, order[0], workflow[zone]))
+        counter +=1
+        if counter>number_of_blue + number_of_green:
+            zone = 2
+        elif counter>number_of_blue:
+            zone = 1
 
 
 def generate_dates():
     global order_history, set_of_var, start_date
-    prev = 18603
-    prev_date = start_date
+    update_generator_vars()
+    prev_x = 18603
+    order_date = start_date
     for order in order_history:
-        prev = prev + generator_rnd_number(set_of_var, prev) * 15000 + 1
-        current_date = prev_date + timedelta(microseconds=prev)
-        # order.append(current_date.isoformat(sep='|'))
-        order.append(current_date)
+        dates = []
+        prev_x = prev_x + generator_rnd_number(set_of_var, prev_x * 10 + 1)
+        current_date = order_date + timedelta(milliseconds=prev_x)
+        order_delta = prev_x
+        dates.append(current_date.isoformat(sep='|'))
+        for i in range(len(order[7])-1):
+            order_delta = order_delta + generator_rnd_number(set_of_var, order_delta) * 1000 + 1
+            current_date =  current_date + timedelta(microseconds=order_delta)
+            dates.append(current_date.isoformat(sep='|'))
+        order.append(dates)
 
 
 def main():
@@ -152,9 +191,13 @@ def main():
     generate_provider()
     generate_direction()
     generate_currency()
+    generate_history()
     generate_dates()
+    table = PrettyTable(["#", "ID","Provider","Direction","Currency","P(init)", "V(init)", "WorkFlow", "Dates"])
     for order in order_history:
-        print(order)
+        table.add_row(order)
+    print(table)
+
 
 
 main()
