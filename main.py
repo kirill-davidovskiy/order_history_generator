@@ -1,14 +1,30 @@
+import datetime
 import json
+import logging
 
 
-basic_generator = {'a': 84589, 'c': 45989, 'm': 217728}
-set_of_var = {'a': 84589, 'c': 45989, 'm': 217728}
-order_history = []
-providers, directions, currency_pairs, currency_price = [],[],[],[]
+basic_generator, set_of_var  = {'a': 84589, 'c': 45989, 'm': 217728}, {}
+order_history, providers, directions, currency_pairs = [], [], [], []
+number_of_orders = 0
 
 
 def get_config():
+    global number_of_orders, set_of_var, providers, directions, currency_pairs
+    with open('config.json') as config_file:
+        data = json.load(config_file)
+    print("Type:", type(data))
+    number_of_orders = data['number_of_orders']
+    set_of_var = data['set_of_var']
+    providers = data['providers']
+    directions = data['directions']
+    currency_pairs = list(data['currency_pairs'].items())
 
+
+def init():
+    global order_history, number_of_orders
+    get_config()
+    for i in range(number_of_orders):
+        order_history.append([])
 
 def generator_rnd_number(set_of_var, prev):
     return (set_of_var['a'] * prev + set_of_var['c']) % set_of_var['m']
@@ -44,6 +60,7 @@ def generate_id():
             order.append(prev_id)
             order.append(start_id + prev_id)
 
+
 def generate_provider():
     global order_history, set_of_var
     update_generator_vars()
@@ -70,11 +87,21 @@ def generate_currency():
         order.append(generator_from_template(set_of_var, order[0], currency_pairs))
 
 
-generate_id()
-generate_provider()
-generate_direction()
-generate_currency()
-for i in range(10):
-    update_generator_vars()
-for order in order_history:
-    print(order)
+def generate_dates():
+    global order_history, set_of_var
+    currentDate = datetime.datetime.now()
+    currentDate += datetime.timedelta(microseconds = 100500)
+    for order in order_history:
+        order.append(generator_from_template(set_of_var, order[0], currency_pairs))
+
+
+def main():
+    init()
+    generate_id()
+    generate_provider()
+    generate_direction()
+    generate_currency()
+    for order in order_history:
+        print(order)
+
+main()
