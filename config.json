@@ -1,0 +1,13 @@
+{
+    "number_of_orders" : 2000,
+    "percent_of_red" : 0.15,
+    "percent_of_blue" : 0.3,
+    "set_of_var" : [84589, 45989, 21772],
+    "Providers": ["FXCM", "SQM"],
+    "Directions": ["Buy", "Sell"],
+    "CurrencyPairs": ["EUR/USD", "GBP/USD", "USD/CHF", "USD/JPY", "AUD/USD", "NZD/USD", "CAD/CHF", "CAD/JPY", "CHF/JPY",
+                     "EUR/AUD", "EUR/CAD", "EUR/CHF", "EUR/GBP", "EUR/JPY", "EUR/NZD", "GBP/AUD", "GBP/CAD", "NZD/CAD",
+                     "NZD/CHF", "NZD/JPY"],
+    "CurrencyPrice": [1.14, 1.26, 0.96, 107.27, 0.7, 0.66, 0,69, 78.92, 113.94,
+                      1.63, 1.54, 1.07, 0.9, 121.82, 1.73, 1.81, 1.71, 0.89]
+}
