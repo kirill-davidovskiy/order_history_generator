@@ -62,29 +62,24 @@ def generate_id():
 
 
 def generate_provider():
-    global order_history, set_of_var
+    global order_history, set_of_var, providers
     update_generator_vars()
-    providers = ['FXCM', 'SQM']
     for order in order_history:
         order.append(generator_from_template(set_of_var, order[0], providers))
 
 
 def generate_direction():
-    global order_history, set_of_var
+    global order_history, set_of_var, directions
     update_generator_vars()
-    directions = ['Sell', 'Buy']
     for order in order_history:
         order.append(generator_from_template(set_of_var, order[0], directions))
 
 
 def generate_currency():
-    global order_history, set_of_var
+    global order_history, set_of_var, currency_pairs
     update_generator_vars()
-    currency_pairs = ['EUR/USD', 'GBP/USD', 'USD/CHF', 'USD/JPY', 'AUD/USD', 'NZD/USD', 'CAD/CHF', 'CAD/JPY', 'CHF/JPY',
-                     'EUR/AUD', 'EUR/CAD', 'EUR/CHF', 'EUR/GBP', 'EUR/JPY', 'EUR/NZD', 'GBP/AUD', 'GBP/CAD', 'NZD/CAD',
-                     'NZD/CHF', 'NZD/JPY']
     for order in order_history:
-        order.append(generator_from_template(set_of_var, order[0], currency_pairs))
+        order.append(generator_from_template(set_of_var, order[0], currency_pairs)[0])
 
 
 def generate_dates():
