@@ -10,6 +10,7 @@ orders, order_history, providers, directions, currency_pairs = [], [], [], [], [
 number_of_orders, percent_of_red, percent_of_blue = 0, 0.15, 0.3
 start_date = datetime.now()
 PATH_DATABASE = os.getcwd() + "/database.json"
+PATH_LOGGER = os.getcwd() + "/Logs/"
 workflow = [
     [["To Provider", "Partially Filled"], ["To Provider", "Rejected"],
      ["To Provider", "Filled"], ["Partially Filled", "Filled"],
@@ -24,6 +25,7 @@ def create_config(path):
     global number_of_orders, start_date
     config = configparser.ConfigParser()
     config.add_section("PATH")
+    config.set("PATH", "database", PATH_LOGGER)
     config.set("PATH", "database", PATH_DATABASE)
     config.set("VALUES", "number_of_orders", 2000)
     config.set("VALUES", "start_date", "12/07/20 00:00:00")
@@ -32,14 +34,17 @@ def create_config(path):
 
 
 def read_config(path):
-    global number_of_orders, start_date
+    global number_of_orders, start_date, PATH_DATABASE, PATH_LOGGER
     if not os.path.exists(path):
+        logging.warn("CANT FIND CONFIG FILE, CREATING STANDART AND USING IT")
         create_config(path)
         read_config(path)
     else:
+        logging.info("Found config")
         config = configparser.ConfigParser()
         config.read(path)
         PATH_DATABASE = config.get("PATH", "database")
+        PATH_LOGGER = config.get("PATH", "logs")
         number_of_orders = int(config.get("VALUES", "number_of_orders"))
         start_date = datetime.strptime(config.get("VALUES", "start_date"), '%d/%m/%y %H:%M:%S')
 
@@ -55,8 +60,13 @@ def get_data():
 
 
 def init():
-    global order_history, number_of_orders
+    global order_history, number_of_orders,PATH_LOGGER
+    print(PATH_LOGGER + "log_" + datetime.now().strftime("%d:%m:%Y_%H:%M"))
+    logging.basicConfig(filename=PATH_LOGGER + "log_" + datetime.now().strftime("%d_%m_%Y_%H_%M"), level = logging.INFO)
+    logging.info("Parsing config")
     read_config("config.cfg")
+
+    logging.info("Getting data from database.json")
     get_data()
     for i in range(number_of_orders):
         order_history.append([])
@@ -78,6 +88,7 @@ def update_generator_vars():
 
 
 def generate_id():
+    logging.info("Genereating ID")
     global order_history, set_of_var
     prev = 2350
     prev_id = 1
@@ -96,27 +107,33 @@ def generate_id():
             order.append(counter)
             order.append(start_id + prev_id)
         counter +=1
+    logging.info("Success")
 
 
 def generate_provider():
+    logging.info("Genereating Providers")
     global order_history, set_of_var, providers
     update_generator_vars()
     for order in order_history:
         order.append(generator_from_template(set_of_var, order[0], providers))
+    logging.info("Success")
 
 
 def generate_direction():
+    logging.info("Genereating Directions")
     global order_history, set_of_var, directions
     update_generator_vars()
     for order in order_history:
         order.append(generator_from_template(set_of_var, order[0], directions))
+    logging.info("Success")
 
 
 def generate_currency():
     global order_history, set_of_var, currency_pairs
     update_generator_vars()
-    prev = 1
+    logging.info("Genereating currency and other")
     for order in order_history:
+
         pair_course = generator_from_template(set_of_var, order[0], currency_pairs)
 
         # curency pair
@@ -137,11 +154,13 @@ def generate_currency():
         # volume
         volume = generator_rnd_number(set_of_var, order[0]) % 1000
         order.append(volume)
+    logging.info("Success")
 
 
 
 def generate_status():
     global order_history
+    logging.info("Genereating status history")
     number_of_blue = int(number_of_orders * percent_of_blue)
     number_of_red = int(number_of_orders * percent_of_red)
     number_of_green = number_of_orders - number_of_blue - number_of_red
@@ -154,10 +173,32 @@ def generate_status():
             zone = 2
         elif counter>number_of_blue:
             zone = 1
+    logging.info("Success")
+
+
+def generate_dates():
+    global order_history, set_of_var, start_date
+    logging.info("Genereating dates history")
+    update_generator_vars()
+    prev_x = 18603
+    order_date = start_date
+    for order in order_history:
+        dates = []
+        prev_x = prev_x + generator_rnd_number(set_of_var, prev_x * 10 + 1)
+        current_date = order_date + timedelta(milliseconds=prev_x)
+        order_delta = prev_x
+        dates.append(current_date.isoformat(sep='|'))
+        for i in range(len(order[7])-1):
+            order_delta = order_delta + generator_rnd_number(set_of_var, order_delta) * 1000 + 1
+            current_date =  current_date + timedelta(microseconds=order_delta)
+            dates.append(current_date.isoformat(sep='|'))
+        order.append(dates)
+    logging.info("Success")
 
 
 def generate_filled():
     global order_history, set_of_var, start_date
+    logging.info("Genereating filled px and vx")
     update_generator_vars()
     for order in order_history:
         px, vx = [], []
@@ -184,28 +225,11 @@ def generate_filled():
                 vx.append('{:.2f}'.format(order[6]/price))
         order.append(px)
         order.append(vx)
-
-
-
-def generate_dates():
-    global order_history, set_of_var, start_date
-    update_generator_vars()
-    prev_x = 18603
-    order_date = start_date
-    for order in order_history:
-        dates = []
-        prev_x = prev_x + generator_rnd_number(set_of_var, prev_x * 10 + 1)
-        current_date = order_date + timedelta(milliseconds=prev_x)
-        order_delta = prev_x
-        dates.append(current_date.isoformat(sep='|'))
-        for i in range(len(order[7])-1):
-            order_delta = order_delta + generator_rnd_number(set_of_var, order_delta) * 1000 + 1
-            current_date =  current_date + timedelta(microseconds=order_delta)
-            dates.append(current_date.isoformat(sep='|'))
-        order.append(dates)
+    logging.info("Success")
 
 
 def generate_history():
+    logging.info("Generating order history")
     generate_id()
     generate_provider()
     generate_direction()
@@ -213,8 +237,11 @@ def generate_history():
     generate_status()
     generate_dates()
     generate_filled()
+    logging.info("Genereating order history completed")
+
 
 def transfer_history_to_orders():
+    logging.info("Transfering history to separated rows")
     global orders, order_history
     for order in order_history:
         for i in range(len(order[8])):
@@ -232,6 +259,7 @@ def transfer_history_to_orders():
             temp_order.append(order[10][i])
             orders.append(temp_order)
     orders = sorted(orders, key=lambda x: x[8])
+    logging.info("Success")
 
 
 def output():
