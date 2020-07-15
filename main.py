@@ -6,60 +6,47 @@ import configparser
 import os
 
 basic_generator, set_of_var = {'a': 84589, 'c': 45989, 'm': 217728}, {}
-order_history, providers, directions, currency_pairs = [], [], [], []
+orders, order_history, providers, directions, currency_pairs = [], [], [], [], []
 number_of_orders, percent_of_red, percent_of_blue = 0, 0.15, 0.3
 start_date = datetime.now()
-PATH_LOGS = (str(os.getcwd() + "/Logs/"))
 PATH_DATABASE = os.getcwd() + "/database.json"
 workflow = [
     [["To Provider", "Partially Filled"], ["To Provider", "Rejected"],
      ["To Provider", "Filled"], ["Partially Filled", "Filled"],
-     ["Partially Filled"], ["Rejected"]],
+     ["Rejected"],["Partially Filled"]],
     [["New", "To Provider", "Filled"], ["New", "To Provider", "Partially Filled"],
      ["New", "To Provider", "Rejected"]],
     [["New"], ["New", "To Provider"]]
 ]
 
 
-# logging.basicConfig(level=logging.INFO,
-#                   filename=PATH_LOGS + datetime.now().strftime("%d:%m:%Y-%H:%M")+".txt")
-
-
 def create_config(path):
     global number_of_orders, start_date
     config = configparser.ConfigParser()
     config.add_section("PATH")
-    config.set("PATH", "logs", PATH_LOGS)
     config.set("PATH", "database", PATH_DATABASE)
     config.set("VALUES", "number_of_orders", 2000)
     config.set("VALUES", "start_date", "12/07/20 00:00:00")
-    config.set("VALUES", "percent_of_red", "0.15")
-    config.set("VALUES", "percent_of_blue", "0.3")
     with open(path, "w") as conf_file:
         config.write(conf_file)
 
 
 def read_config(path):
     global number_of_orders, start_date
-    # logging.info("Reading config")
     if not os.path.exists(path):
-        # logging.warn("CANT FIND CONFIG FILE, CREATING STANDART AND USING IT")
         create_config(path)
         read_config(path)
     else:
         config = configparser.ConfigParser()
         config.read(path)
-        PATH_LOGS = config.get("PATH", "logs")
         PATH_DATABASE = config.get("PATH", "database")
         number_of_orders = int(config.get("VALUES", "number_of_orders"))
-        percent_of_red = float(config.get("VALUES", "percent_of_red"))
-        percent_of_blue = float(config.get("VALUES", "percent_of_blue"))
         start_date = datetime.strptime(config.get("VALUES", "start_date"), '%d/%m/%y %H:%M:%S')
 
 
 def get_data():
-    global set_of_var, providers, directions, currency_pairs
-    with open('database.json') as config_file:
+    global set_of_var, providers, directions, currency_pairs, PATH_DATABASE
+    with open(PATH_DATABASE) as config_file:
         data = json.load(config_file)
     set_of_var = data['set_of_var']
     providers = data['providers']
@@ -130,11 +117,13 @@ def generate_currency():
     update_generator_vars()
     prev = 1
     for order in order_history:
+        pair_course = generator_from_template(set_of_var, order[0], currency_pairs)
+
         # curency pair
-        order.append(generator_from_template(set_of_var, order[0], currency_pairs)[0])
+        order.append(pair_course[0])
 
         # px
-        course = generator_from_template(set_of_var, order[0], currency_pairs)[1]
+        course = pair_course[1]
         delta = generator_rnd_number(set_of_var, order[0])
         if delta % 2 == 0:
             while delta > 0.05:
@@ -151,7 +140,7 @@ def generate_currency():
 
 
 
-def generate_history():
+def generate_status():
     global order_history
     number_of_blue = int(number_of_orders * percent_of_blue)
     number_of_red = int(number_of_orders * percent_of_red)
@@ -165,6 +154,37 @@ def generate_history():
             zone = 2
         elif counter>number_of_blue:
             zone = 1
+
+
+def generate_filled():
+    global order_history, set_of_var, start_date
+    update_generator_vars()
+    for order in order_history:
+        px, vx = [], []
+        for status in order[7]:
+            if status == "New" or status == "To Provider" or status == "Rejected":
+                px.append("Null")
+                vx.append("Null")
+            elif status == "Filled":
+                px.append(order[5])
+                vx.append(order[6])
+            else:
+                price = 0
+                delta = generator_rnd_number(set_of_var, order[0])
+                if delta % 2 == 0:
+                    while delta > 0.05:
+                        delta = delta / 10
+                    price = float('{:.6f}'.format(order[5] + order[5] * delta))
+                    px.append(price)
+                else:
+                    while delta > 0.05:
+                        delta = delta / 10
+                    price = float('{:.6f}'.format(order[5] - order[5] * delta))
+                    px.append(price)
+                vx.append('{:.2f}'.format(order[6]/price))
+        order.append(px)
+        order.append(vx)
+
 
 
 def generate_dates():
@@ -185,19 +205,50 @@ def generate_dates():
         order.append(dates)
 
 
-def main():
-    init()
+def generate_history():
     generate_id()
     generate_provider()
     generate_direction()
     generate_currency()
-    generate_history()
+    generate_status()
     generate_dates()
-    table = PrettyTable(["#", "ID","Provider","Direction","Currency","P(init)", "V(init)", "WorkFlow", "Dates"])
+    generate_filled()
+
+def transfer_history_to_orders():
+    global orders, order_history
     for order in order_history:
+        for i in range(len(order[8])):
+            temp_order = []
+            temp_order.append(order[0])
+            temp_order.append(order[1])
+            temp_order.append(order[2])
+            temp_order.append(order[3])
+            temp_order.append(order[4])
+            temp_order.append(order[5])
+            temp_order.append(order[6])
+            temp_order.append(order[7][i])
+            temp_order.append(order[8][i])
+            temp_order.append(order[9][i])
+            temp_order.append(order[10][i])
+            orders.append(temp_order)
+    orders = sorted(orders, key=lambda x: x[8])
+
+
+def output():
+    global orders
+    table = PrettyTable()
+    table.field_names = ["#","ID","Provider,","Direction","Currency","P(init)","V(init)","Status","Date","P(filled)","V(filled)"]
+    for order in orders:
         table.add_row(order)
     print(table)
 
 
+def main():
+    init()
+    generate_history()
+    transfer_history_to_orders()
+    output()
 
-main()
+
+if __name__ == "__main__":
+    main()
