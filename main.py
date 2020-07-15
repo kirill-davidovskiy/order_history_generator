@@ -61,7 +61,6 @@ def get_data():
 
 def init():
     global order_history, number_of_orders,PATH_LOGGER
-    print(PATH_LOGGER + "log_" + datetime.now().strftime("%d:%m:%Y_%H:%M"))
     logging.basicConfig(filename=PATH_LOGGER + "log_" + datetime.now().strftime("%d_%m_%Y_%H_%M"), level = logging.INFO)
     logging.info("Parsing config")
     read_config("config.cfg")
